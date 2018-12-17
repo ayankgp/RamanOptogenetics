@@ -60,7 +60,6 @@ typedef struct parameters{
 
     double* lower_bound;
     double* upper_bound;
-    int max_iter;
 
 } parameters;
 
@@ -422,8 +421,8 @@ void L_operate(cmplx* Qmat, const cmplx field_ti, molecule* mol)
                 Lmat[m * nDIM + n] += - I * (energies[m] - energies[n]) * Qmat[m * nDIM + n];
                 for(k = 0; k < nDIM; k++)
                 {
-//                    Lmat[m * nDIM + n] -= 0.5 * (gamma_population_decay[k * nDIM + n] + gamma_population_decay[k * nDIM + m]) * Qmat[m * nDIM + n];
-//                    Lmat[m * nDIM + n] += gamma_population_decay[m * nDIM + k] * Qmat[k * nDIM + k];
+                    Lmat[m * nDIM + n] -= 0.5 * (gamma_population_decay[k * nDIM + n] + gamma_population_decay[k * nDIM + m]) * Qmat[m * nDIM + n];
+                    Lmat[m * nDIM + n] += gamma_population_decay[m * nDIM + k] * Qmat[k * nDIM + k];
                     Lmat[m * nDIM + n] += I * field_ti * (mu[m * nDIM + k] * Qmat[k * nDIM + n] - Qmat[m * nDIM + k] * mu[k * nDIM + n]);
                 }
                 Lmat[m * nDIM + n] -= gamma_pure_dephasing[m * nDIM + n] * Qmat[m * nDIM + n];
@@ -497,7 +496,7 @@ void PropagateAbs(molecule* mol, const parameters *const params, const int indx)
 
 void copy_molecule(molecule* original, molecule* copy, parameters* params)
 //-------------------------------------------------------------------//
-//    MAKING ADEEP COPY OF AN INSTANCE OF THE MOLECULE STRUCTURE     //
+//    MAKING A DEEP COPY OF AN INSTANCE OF THE MOLECULE STRUCTURE    //
 //-------------------------------------------------------------------//
 {
     int N = params->mu_guess_num;
@@ -533,115 +532,35 @@ void copy_molecule(molecule* original, molecule* copy, parameters* params)
 }
 
 
-double nloptJ(unsigned N, const double *opt_params, double *grad_J, void *nloptJ_params)
-{
-
-    mol_system* system = (mol_system*)nloptJ_params;
-
-    parameters* params = system->params;
-    molecule** ensemble = system->ensemble;
-    molecule* molA = system->original;
-
-    int nDIM = params->nDIM;
-    memset(molA->absorption_spectra, 0, params->freqDIM_A*sizeof(double));
-
-    for(int j=0; j<params->mu_guess_num; j++)
-    {
-        memcpy(ensemble[j]->mu, molA->mu, nDIM*nDIM*sizeof(cmplx));
-        scale_mat(ensemble[j]->mu, opt_params[j], params->nDIM);
-    }
-
-    #pragma omp parallel for
-    for(int j=0; j<params->mu_guess_num; j++)
-        for(int i=0; i<params->freqDIM_A; i++)
-        {
-            memset(ensemble[j]->absorption_spectra, 0, params->freqDIM_A*sizeof(double));
-            CalculateAbsorptionSpectraField(ensemble[j], params, i);
-            PropagateAbs(ensemble[j], params, i);
-            add_vec(ensemble[j]->absorption_spectra, molA->absorption_spectra, params->freqDIM_A);
-        }
-
-    scale_vec(molA->absorption_spectra, 100./vec_max(molA->absorption_spectra, params->freqDIM_A), params->freqDIM_A);
-
-    double J;
-    J = vec_diff_norm(params->reference_spectra, molA->absorption_spectra, params->freqDIM_A);
-
-    printf("(");
-    for(int i=0; i<params->mu_guess_num; i++)
-    {
-        printf("%g ", opt_params[i]);
-    }
-    printf(")  fit = %g \n", J);
-    return J;
-}
-
-
 cmplx* CalculateSpectra(molecule* molA, molecule* molB, parameters* params)
-//------------------------------------------------------------//
-//    GETTING rho(T) FROM rho(0) USING PROPAGATE FUNCTION     //
-//------------------------------------------------------------//
+//--------------------------------------------------------------------//
+//        GETTING rho(T) FROM rho(0) USING PROPAGATE FUNCTION         //
+//--------------------------------------------------------------------//
 {
-    int j;
+    int tid;
+
+    scale_mat(molB->mu, params->exc_coeff_ratio, params->nDIM);
+
     omp_set_num_threads(params->thread_num);
     molecule** ensemble = (molecule**)malloc(params->mu_guess_num * sizeof(molecule*));
+
     for(int i=0; i<params->mu_guess_num; i++)
     {
         ensemble[i] = (molecule*)malloc(sizeof(molecule));
         copy_molecule(molA, ensemble[i], params);
-        for(j=0; j<params->nDIM - params->nEXC; j++)
+        print_double_mat(ensemble[i]->gamma_pure_dephasing, params->nDIM);
+        for(int j=0; j<params->nDIM - params->nEXC; j++)
         {
             ensemble[i]->energies[j] = params->Raman_levels[j];
         }
-        for(j=0; j<params->nEXC; j++)
+
+        for(int j=0; j<params->nEXC; j++)
         {
             ensemble[i]->energies[params->nDIM - params->nEXC + j] = params->freq_points[4*i+j];
         }
+        scale_mat(ensemble[i]->mu, params->mu_guess[i], params->nDIM);
     }
-    printf("\n");
-
-    mol_system system;
-    system.ensemble = ensemble;
-    system.original = (molecule*)malloc(sizeof(molecule));
-    memcpy(system.original, molA, sizeof(molecule));
-    system.params = params;
-
-    nlopt_opt opt;
-
-    double *lower_bound = params->lower_bound;
-    double *upper_bound = params->upper_bound;
-
-    opt = nlopt_create(NLOPT_LN_COBYLA, params->mu_guess_num);
-    nlopt_set_lower_bounds(opt, lower_bound);
-    nlopt_set_upper_bounds(opt, upper_bound);
-    nlopt_set_min_objective(opt, nloptJ, (void*)&system);
-    nlopt_set_xtol_rel(opt, 1.E-6);
-    nlopt_set_maxeval(opt, params->max_iter);
-
-    double *x =  params->mu_guess;
-    double minf;
-
-    if (nlopt_optimize(opt, x, &minf) < 0) {
-        printf("nlopt failed!\n");
-    }
-    else {
-        printf("found minimum at (");
-
-        for(int m=0; m<params->mu_guess_num; m++)
-        {
-            printf(" %g", x[m]);
-        }
-        printf(") = %g\n", minf);
-    }
-    nlopt_destroy(opt);
-
-    int nDIM = params->nDIM;
-    memset(molA->absorption_spectra, 0, params->freqDIM_A*sizeof(double));
-
-    for(int j=0; j<params->mu_guess_num; j++)
-    {
-        memcpy(ensemble[j]->mu, molA->mu, nDIM*nDIM*sizeof(cmplx));
-        scale_mat(ensemble[j]->mu, x[j], params->nDIM);
-    }
+    print_double_vec(ensemble[2]->energies, params->nDIM);
 
     #pragma omp parallel for
     for(int j=0; j<params->mu_guess_num; j++)
@@ -652,7 +571,7 @@ cmplx* CalculateSpectra(molecule* molA, molecule* molB, parameters* params)
             PropagateAbs(ensemble[j], params, i);
             add_vec(ensemble[j]->absorption_spectra, molA->absorption_spectra, params->freqDIM_A);
         }
-
-        scale_vec(molA->absorption_spectra, 100./vec_max(molA->absorption_spectra, params->freqDIM_A), params->freqDIM_A);
-
+    free(ensemble);
+    scale_vec(molA->absorption_spectra, 100./vec_max(molA->absorption_spectra, params->freqDIM_A), params->freqDIM_A);
+    printf("The norm of fit is %g \n", vec_diff_norm(params->reference_spectra, molA->absorption_spectra, params->freqDIM_A));
 }

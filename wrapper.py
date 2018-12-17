@@ -54,7 +54,10 @@ class Parameters(Structure):
         ('mu_guess_num', c_int),
         ('freq_points', POINTER(c_double)),
         ('reference_spectra', POINTER(c_double)),
-        ('Raman_levels', POINTER(c_double))
+        ('Raman_levels', POINTER(c_double)),
+        ('lower_bound', POINTER(c_double)),
+        ('upper_bound', POINTER(c_double)),
+        ('max_iter', c_int)
     ]
 
 

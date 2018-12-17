@@ -125,6 +125,9 @@ class RamanControl:
         spectra_params.freq_points = params.freq_points.ctypes.data_as(POINTER(c_double))
         spectra_params.reference_spectra = params.reference_spectra.ctypes.data_as(POINTER(c_double))
         spectra_params.Raman_levels = params.Raman_levels.ctypes.data_as(POINTER(c_double))
+        spectra_params.lower_bound = params.lower_bound.ctypes.data_as(POINTER(c_double))
+        spectra_params.upper_bound = params.upper_bound.ctypes.data_as(POINTER(c_double))
+        spectra_params.max_iter = params.max_iter
 
     def calculate_spectra(self, params):
         molA = Molecule()
@@ -163,7 +166,7 @@ if __name__ == '__main__':
     np.fill_diagonal(gamma_population_decay, 0.0)
     gamma_population_decay = np.tril(gamma_population_decay).T
 
-    electronic_dephasingA = 1.8*2.418884e-4
+    electronic_dephasingA = 1.98*2.418884e-4
     electronic_dephasingB = 2.418884e-4
     vibrational_dephasing = 2.418884e-6
     gamma_pure_dephasingA = np.ones_like(gamma_population_decay) * vibrational_dephasing
@@ -190,10 +193,12 @@ if __name__ == '__main__':
     absPR *= 100. / absPR.max()
     absPFR *= 100. / absPFR.max()
 
-    mu_factor_A = np.asarray([0.10, 0.15, 0.18, 0.23, 0.31, 0.37, 0.45, 0.5, 0.55, 0.75, 0.8, 0.5][::-1])
+    mu_factor_A = np.asarray([0.18, 0.22, 0.23, 0.28, 0.35, 0.41, 0.51, 0.56, 0.61, 0.71, 0.75, 0.6][::-1])
     mu_factor_B = np.asarray([0.10, 0.15, 0.18, 0.23, 0.31, 0.37, 0.45, 0.5, 0.55, 0.75, 0.8, 0.5][::-1])
-    freq_points_A = np.asarray(1239.84 / np.linspace(505, 690, 4 * len(mu_factor_A))[::-1])
-    freq_points_B = np.asarray(1239.84 / np.linspace(540, 742, 4 * len(mu_factor_A))[::-1])
+    lower_bound = mu_factor_A - 0.1
+    upper_bound = mu_factor_A + 0.1
+    freq_points_A = np.asarray(1239.84 / np.linspace(505, 690, 4 * len(mu_factor_A))[::-1])*energy_factor
+    freq_points_B = np.asarray(1239.84 / np.linspace(540, 742, 4 * len(mu_factor_A))[::-1])*energy_factor
     Raman_levels = np.asarray([0.000, 0.09832, 0.16304, 0.20209])*energy_factor
 
     params = ADict(
@@ -228,7 +233,12 @@ if __name__ == '__main__':
         freq_points=np.ascontiguousarray(freq_points_A),
 
         reference_spectra=np.ascontiguousarray(absPR),
-        Raman_levels=Raman_levels
+        Raman_levels=Raman_levels,
+
+        lower_bound=lower_bound,
+        upper_bound=upper_bound,
+
+        max_iter=175
     )
 
     FourLevels = dict(
@@ -258,7 +268,7 @@ if __name__ == '__main__':
 
     fig, axes = plt.subplots(nrows=1, ncols=1)
     axes.plot(energy_factor * 1239.84 / molecule.frequency_A, molecule.abs_spectraA, 'r*-', label='Fitted_A', linewidth=2.)
-    axes.plot(wavelengthPR, absPR, 'k*-', label='Experimental_A')
+    axes.plot(wavelengthPR, absPR, 'k', label='Experimental_A')
     axes.set_xlabel('Wavelength (in nm)', fontweight='bold')
     axes.set_ylabel('Normalized spectra', fontweight='bold')
     plt.legend()
