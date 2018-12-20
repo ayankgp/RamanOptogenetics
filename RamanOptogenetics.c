@@ -572,7 +572,7 @@ void ExcitationControl(molecule* mol, const parameters *const params)
 
     cmplx* L_rho_func = (cmplx*)calloc(nDIM * nDIM, sizeof(cmplx));
     copy_mat(rho_0, L_rho_func, nDIM);
-    print_complex_mat(mol->rho, nDIM);
+//    print_complex_mat(mol->rho, nDIM);
 //    copy_mat(rho_0, mol->rho, nDIM);
 
     for(t_index=0; t_index<timeDIM_abs; t_index++)
