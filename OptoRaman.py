@@ -120,11 +120,14 @@ class RamanControl:
 
         spectra_params.exc_coeff_ratio = params.exc_coeff_ratio
         spectra_params.thread_num = params.num_threads
-        spectra_params.mu_guess = params.mu_guess.ctypes.data_as(POINTER(c_double))
-        spectra_params.mu_guess_num = len(params.mu_guess)
-        spectra_params.freq_points = params.freq_points.ctypes.data_as(POINTER(c_double))
+        spectra_params.mu_guess_A = params.mu_guess_A.ctypes.data_as(POINTER(c_double))
+        spectra_params.mu_guess_B = params.mu_guess_B.ctypes.data_as(POINTER(c_double))
+        spectra_params.mu_guess_num = len(params.mu_guess_A)
+        spectra_params.freq_points_A = params.freq_points_A.ctypes.data_as(POINTER(c_double))
+        spectra_params.freq_points_B = params.freq_points_B.ctypes.data_as(POINTER(c_double))
         spectra_params.reference_spectra = params.reference_spectra.ctypes.data_as(POINTER(c_double))
-        spectra_params.Raman_levels = params.Raman_levels.ctypes.data_as(POINTER(c_double))
+        spectra_params.Raman_levels_A = params.Raman_levels_A.ctypes.data_as(POINTER(c_double))
+        spectra_params.Raman_levels_B = params.Raman_levels_B.ctypes.data_as(POINTER(c_double))
         spectra_params.lower_bound = params.lower_bound.ctypes.data_as(POINTER(c_double))
         spectra_params.upper_bound = params.upper_bound.ctypes.data_as(POINTER(c_double))
         spectra_params.max_iter = params.max_iter
@@ -135,7 +138,8 @@ class RamanControl:
         self.create_molecules(molA, molB)
         params_spectra = Parameters()
         self.create_parameters_spectra(params_spectra, params)
-        CalculateSpectra(molA, molB, params_spectra)
+        CalculateSpectra(molA, params_spectra)
+        # CalculateControl(molA, molB, params_spectra)
         return
 
 
@@ -144,6 +148,38 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
     import time
     import pandas as pd
+
+    import numpy as np
+    from scipy.interpolate import interp1d
+
+    dfC = pd.read_csv('cerulean.csv', sep=',')
+    dfG = pd.read_csv('GCAMP.csv', sep=',')
+    wavelengthG = dfG.values[:, 0]
+    wavelengthC = dfC.values[:, 0]
+
+    energy_factor = 1. / 27.211385
+    absG = dfG.values[:, 1]
+    absG *= 100. / absG.max()
+
+    absC = dfC.values[:, 1]
+    absC *= 100. / absC.max()
+
+    fG = interp1d(wavelengthG, absG, kind='cubic')
+    wavelengthG_new = 1. / np.linspace(1. / wavelengthG.max(), 1. / wavelengthG.min(), 100)
+    absG_new = fG(wavelengthG_new)
+    absG_new *= 100. / absG_new.max()
+    freqG = (1239.84 * energy_factor / wavelengthG_new)
+
+    fC = interp1d(wavelengthC, absC, kind='cubic')
+    wavelengthC_new = 1. / np.linspace(1. / wavelengthC.max(), 1. / wavelengthC.min(), 100)
+    absC_new = fC(wavelengthC_new)
+    absC_new *= 100. / absC_new.max()
+    freqC = (1239.84 * energy_factor / wavelengthC_new)
+
+    plt.plot(wavelengthG, absG)
+    plt.plot(wavelengthC, absC)
+    plt.plot(wavelengthG_new, absG_new, 'k')
+    plt.plot(wavelengthC_new, absC_new, 'r')
 
     energy_factor = 1. / 27.211385
     time_factor = .02418884 / 1000
@@ -166,9 +202,10 @@ if __name__ == '__main__':
     np.fill_diagonal(gamma_population_decay, 0.0)
     gamma_population_decay = np.tril(gamma_population_decay).T
 
-    electronic_dephasingA = 1.98*2.418884e-4
-    electronic_dephasingB = 2.418884e-4
-    vibrational_dephasing = 2.418884e-6
+    electronic_dephasingA = 2.5 * 2.418884e-4  # GCaMP
+    electronic_dephasingB = 5.0 * 2.418884e-4  # channelrhodopsin
+    # electronic_dephasingB = 2.5 * 2.418884e-4  # cerulean
+    vibrational_dephasing = 0.1 * 2.418884e-5
     gamma_pure_dephasingA = np.ones_like(gamma_population_decay) * vibrational_dephasing
     gamma_pure_dephasingB = np.ones_like(gamma_population_decay) * vibrational_dephasing
     np.fill_diagonal(gamma_pure_dephasingA, 0.0)
@@ -181,26 +218,18 @@ if __name__ == '__main__':
             gamma_pure_dephasingB[i, j] = electronic_dephasingB
             gamma_pure_dephasingB[j, i] = electronic_dephasingB
 
-    df = pd.read_csv('Cph8_RefSpectra.csv', sep=',')
-    wavelengthPR = df.values[:, 0][:600][0:-1:6]
-    wavelengthPFR = df.values[:, 0][:700][0:-1:7]
+    mu_factor_A = np.asarray([0.364371, 0.756078, 0.999998, 0.999041, 0.999963, 0.782984, 0.711011, 0.481362, 0.404174, 0.325918, 0.242887, 0.165863])  # GCaMP
+    # mu_factor_B = np.asarray([0.376979, 0.760245, 1, 0.999439, 0.999927, 0.786846, 0.708944, 0.695928, 0.957517, 0.998632, 0.996917, 0.999331])  # channelrhodopsin
+    mu_factor_B = np.asarray([0.360422, 0.88336, 1, 0.999998, 0.999953, 0.7802, 0.616421, 0.456223, 0.348055, 0.305119, 0.315951, 0.274767])  # cerulean
+    lower_bound = np.zeros_like(mu_factor_A)
+    upper_bound = np.ones_like(mu_factor_A)
+    freq_points_A = np.asarray(1239.84 / np.linspace(410, 520, 4 * len(mu_factor_A))[::-1])*energy_factor  # GCaMP
+    # freq_points_B = np.asarray(1239.84 / np.linspace(270, 540, 4 * len(mu_factor_A))[::-1])*energy_factor  # channelrhodopsin
+    freq_points_B = np.asarray(1239.84 / np.linspace(320, 480, 4 * len(mu_factor_A))[::-1])*energy_factor  # cerulean
+    Raman_levels_A = np.asarray([0.000, 0.09832, 0.16304, 0.20209])*energy_factor
+    Raman_levels_B = np.asarray([0.000, 0.09832, 0.16304, 0.19909])*energy_factor
 
-    freqPR = (1239.84 * energy_factor / wavelengthPR)
-    freqPFR = (1239.84 * energy_factor / wavelengthPFR)
-    absPR = df.values[:, 1][:600][0:-1:6]
-    absPFR = df.values[:, 2][:700][0:-1:7]
-
-    absPR *= 100. / absPR.max()
-    absPFR *= 100. / absPFR.max()
-
-    mu_factor_A = np.asarray([0.18, 0.22, 0.23, 0.28, 0.35, 0.41, 0.51, 0.56, 0.61, 0.71, 0.75, 0.6][::-1])
-    mu_factor_B = np.asarray([0.10, 0.15, 0.18, 0.23, 0.31, 0.37, 0.45, 0.5, 0.55, 0.75, 0.8, 0.5][::-1])
-    lower_bound = mu_factor_A - 0.1
-    upper_bound = mu_factor_A + 0.1
-    freq_points_A = np.asarray(1239.84 / np.linspace(505, 690, 4 * len(mu_factor_A))[::-1])*energy_factor
-    freq_points_B = np.asarray(1239.84 / np.linspace(540, 742, 4 * len(mu_factor_A))[::-1])*energy_factor
-    Raman_levels = np.asarray([0.000, 0.09832, 0.16304, 0.20209])*energy_factor
-
+    print(1239.84/(freq_points_A[0]/energy_factor))
     params = ADict(
 
         nEXC=N_exc,
@@ -214,31 +243,39 @@ if __name__ == '__main__':
         timeDIM_R=10000,
         timeAMP_R=52000,
 
-        frequencyDIM_A=freqPR.size,
-        frequency_A=freqPR,
+        frequencyDIM_A=freqG.size,
+        frequency_A=freqG,
         frequencyDIM_R=250,
         frequencyMIN_R=0.075*energy_factor,
         frequencyMAX_R=0.21*energy_factor,
 
-        field_amp_R=0.0000185,
-        field_amp_A=0.0000018,
+        field_amp_R=0.000032,
+        field_amp_A=0.00000125,
 
         omega_R=0.5*energy_factor,
-        omega_v=energies_A[3],
-        omega_e=(energies_A[4] - energies_A[3]),
-        
-        exc_coeff_ratio=.7366,
-        num_threads=cpu_count(),
-        mu_guess=mu_factor_A,
-        freq_points=np.ascontiguousarray(freq_points_A),
+        # omega_v=Raman_levels_A[3],
+        # omega_e=(freq_points_A[0] - Raman_levels_A[3]),
+        # omega_e=freq_points_A[0],
+        #
+        omega_v=Raman_levels_B[3],
+        omega_e=(freq_points_B[0] - Raman_levels_B[3]),
+        # omega_e=freq_points_B[0],
 
-        reference_spectra=np.ascontiguousarray(absPR),
-        Raman_levels=Raman_levels,
+        exc_coeff_ratio=1,
+        num_threads=cpu_count(),
+        mu_guess_A=mu_factor_A,
+        mu_guess_B=mu_factor_B,
+        freq_points_A=np.ascontiguousarray(freq_points_A),
+        freq_points_B=np.ascontiguousarray(freq_points_B),
+
+        reference_spectra=np.ascontiguousarray(absG_new),
+        Raman_levels_A=Raman_levels_A,
+        Raman_levels_B=Raman_levels_B,
 
         lower_bound=lower_bound,
         upper_bound=upper_bound,
 
-        max_iter=175
+        max_iter=100
     )
 
     FourLevels = dict(
@@ -262,16 +299,72 @@ if __name__ == '__main__':
     molecule = RamanControl(params, **FourLevels)
     molecule.calculate_spectra(params)
 
-    print(np.linalg.norm((absPR - molecule.abs_spectraA), 1))
+    print(np.linalg.norm((absG_new - molecule.abs_spectraA), 1))
 
     print(time.time() - start)
 
     fig, axes = plt.subplots(nrows=1, ncols=1)
     axes.plot(energy_factor * 1239.84 / molecule.frequency_A, molecule.abs_spectraA, 'r*-', label='Fitted_A', linewidth=2.)
-    axes.plot(wavelengthPR, absPR, 'k', label='Experimental_A')
+    axes.plot(wavelengthG_new, absG_new, 'k', label='Experimental_A')
     axes.set_xlabel('Wavelength (in nm)', fontweight='bold')
     axes.set_ylabel('Normalized spectra', fontweight='bold')
     plt.legend()
     render_ticks(axes)
+    # fig.savefig('fit_chr2.eps', format='eps')
+
+    # fig, axes = plt.subplots(nrows=3, ncols=1, sharex=True)
+    #
+    # molecule.time_A += molecule.time_R.max() + molecule.time_A.max()
+    # time_axis = time_factor * (molecule.time_R.max() + np.concatenate((molecule.time_R, molecule.time_A)))
+    #
+    # axes[0].plot(time_factor * (molecule.time_R.max() + molecule.time_R), 5.142e9*molecule.field_R.real, 'k', linewidth=1.5)
+    # axes[0].plot(time_factor * (molecule.time_R.max() + molecule.time_A), 5.142e9*molecule.field_A.real, 'darkblue', linewidth=1.5)
+    #
+    # axes[1].plot(time_factor * (molecule.time_R.max() + molecule.time_R), molecule.dyn_rho_R_A[0], 'b', label='g1_A', linewidth=1.)
+    # axes[1].plot(time_factor * (molecule.time_R.max() + molecule.time_A), molecule.dyn_rho_A_A[0], 'b', label='g1_A', linewidth=2.5)
+    #
+    # axes[1].plot(time_factor * (molecule.time_R.max() + molecule.time_R), molecule.dyn_rho_R_A[3], 'r', label='g4_A', linewidth=1.)
+    # axes[1].plot(time_factor * (molecule.time_R.max() + molecule.time_A), molecule.dyn_rho_A_A[3], 'r', label='g4_A', linewidth=2.5)
+    #
+    # axes[1].plot(time_factor * (molecule.time_R.max() + molecule.time_R), molecule.dyn_rho_R_A[4:].sum(axis=0), 'k', label='EXC_A', linewidth=1.)
+    # axes[1].plot(time_factor * (molecule.time_R.max() + molecule.time_A), molecule.dyn_rho_A_A[4:].sum(axis=0), 'k', label='EXC_A', linewidth=2.5)
+    #
+    # axes[2].plot(time_factor * (molecule.time_R.max() + molecule.time_R), molecule.dyn_rho_R_B[0], 'b', label='g1_B', linewidth=1.)
+    # axes[2].plot(time_factor * (molecule.time_R.max() + molecule.time_A), molecule.dyn_rho_A_B[0], 'b', label='g1_B', linewidth=2.5)
+    #
+    # axes[2].plot(time_factor * (molecule.time_R.max() + molecule.time_R), molecule.dyn_rho_R_B[3], 'r', label='g4_B', linewidth=1.)
+    # axes[2].plot(time_factor * (molecule.time_R.max() + molecule.time_A), molecule.dyn_rho_A_B[3], 'r', label='g4_B', linewidth=2.5)
+    #
+    # axes[2].plot(time_factor * (molecule.time_R.max() + molecule.time_R), molecule.dyn_rho_R_B[4:].sum(axis=0), 'k', label='EXC_B', linewidth=1.)
+    # axes[2].plot(time_factor * (molecule.time_R.max() + molecule.time_A), molecule.dyn_rho_A_B[4:].sum(axis=0), 'k', label='EXC_B', linewidth=2.5)
+    #
+    # axes[2].set_xlabel('Time (in ps)', fontweight='bold')
+    # axes[0].set_ylabel('Electric field \n (in V/cm)', fontweight='bold')
+    # axes[0].ticklabel_format(style='sci', scilimits=(0, 3))
+    # axes[1].set_ylabel('Population \n VSFP', fontweight='bold')
+    # axes[2].set_ylabel('Population \n ChR2', fontweight='bold')
+    # render_ticks(axes[0])
+    # render_ticks(axes[1])
+    # render_ticks(axes[2])
+    # axes[0].yaxis.set_label_position("right")
+    # axes[1].yaxis.set_label_position("right")
+    # axes[2].yaxis.set_label_position("right")
+    #
+    # axes[1].legend(loc=6)
+    # axes[2].legend(loc=6)
+    #
+    # fig.subplots_adjust(left=0.15, hspace=0.1)
+    #
+    # print(molecule.rhoA.diagonal()[:4].sum(), molecule.rhoA.diagonal()[4:].sum())
+    # print(molecule.rhoA.diagonal(), molecule.rhoA.diagonal().sum())
+    # print()
+    # print(molecule.rhoB.diagonal()[:4].sum(), molecule.rhoB.diagonal()[4:].sum())
+    # print(molecule.rhoB.diagonal(), molecule.rhoB.diagonal().sum())
+    #
+    # print(molecule.rhoA.diagonal()[4:].sum() / molecule.rhoB.diagonal()[4:].sum())
+    # print(molecule.rhoA.diagonal()[4:].sum() ** 2 / molecule.rhoB.diagonal()[4:].sum())
+    #
+    # print(molecule.rhoB.diagonal()[4:].sum() / molecule.rhoA.diagonal()[4:].sum())
+    # print(molecule.rhoB.diagonal()[4:].sum() ** 2 / molecule.rhoA.diagonal()[4:].sum())
 
     plt.show()

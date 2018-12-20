@@ -50,11 +50,14 @@ class Parameters(Structure):
 
         ('exc_coeff_ratio', c_double),
         ('thread_num', c_int),
-        ('mu_guess', POINTER(c_double)),
+        ('mu_guess_A', POINTER(c_double)),
+        ('mu_guess_B', POINTER(c_double)),
         ('mu_guess_num', c_int),
-        ('freq_points', POINTER(c_double)),
+        ('freq_points_A', POINTER(c_double)),
+        ('freq_points_B', POINTER(c_double)),
         ('reference_spectra', POINTER(c_double)),
-        ('Raman_levels', POINTER(c_double)),
+        ('Raman_levels_A', POINTER(c_double)),
+        ('Raman_levels_B', POINTER(c_double)),
         ('lower_bound', POINTER(c_double)),
         ('upper_bound', POINTER(c_double)),
         ('max_iter', c_int)
@@ -97,14 +100,28 @@ except OSError:
 
 lib1.CalculateSpectra.argtypes = (
     POINTER(Molecule),                  # molecule molA
-    POINTER(Molecule),                  # molecule molB
     POINTER(Parameters),        # parameter field_params
 )
 lib1.CalculateSpectra.restype = POINTER(c_complex)
 
 
-def CalculateSpectra(molA, molB, params):
+def CalculateSpectra(molA, params):
     return lib1.CalculateSpectra(
+        molA,
+        params
+    )
+
+
+lib1.CalculateControl.argtypes = (
+    POINTER(Molecule),                  # molecule molA
+    POINTER(Molecule),                  # molecule molB
+    POINTER(Parameters),        # parameter field_params
+)
+lib1.CalculateControl.restype = POINTER(c_complex)
+
+
+def CalculateControl(molA, molB, params):
+    return lib1.CalculateControl(
         molA,
         molB,
         params
