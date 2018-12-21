@@ -300,9 +300,9 @@ double vec_diff_norm(const double *const A, const double *const B, const int nDI
 // 	   RETURNS L-1 NORM OF VECTOR DIFFERENCE          //
 //----------------------------------------------------//
 {
-    int nfrac = (int)(nDIM/2.2);
+    int nfrac = (int)(nDIM/18);
     double norm, norm1 = 0.0;
-    for(int i=0; i<nDIM; i++)
+    for(int i=nfrac; i<nDIM; i++)
     {
         norm += fabs(A[i]-B[i]);
     }

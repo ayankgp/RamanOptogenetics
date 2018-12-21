@@ -153,7 +153,7 @@ if __name__ == '__main__':
     from scipy.interpolate import interp1d
 
     dfC = pd.read_csv('ChR2.csv', sep=',')
-    dfG = pd.read_csv('GCAMP.csv', sep=',')
+    dfG = pd.read_csv('ChR2.csv', sep=',')
     wavelengthG = dfG.values[:, 0]
     wavelengthC = dfC.values[:, 0]
 
@@ -202,7 +202,7 @@ if __name__ == '__main__':
     np.fill_diagonal(gamma_population_decay, 0.0)
     gamma_population_decay = np.tril(gamma_population_decay).T
 
-    # electronic_dephasingA = .2 * 2.418884e-4  # GCaMP
+    # electronic_dephasingA = 2.5 * 2.418884e-4  # GCaMP
     electronic_dephasingA = 5.0 * 2.418884e-4  # channelrhodopsin
     electronic_dephasingB = 2.0 * 2.418884e-4  # cerulean
     vibrational_dephasing = 0.1 * 2.418884e-5
@@ -218,16 +218,29 @@ if __name__ == '__main__':
             gamma_pure_dephasingB[i, j] = electronic_dephasingB
             gamma_pure_dephasingB[j, i] = electronic_dephasingB
 
-    # mu_factor_A = np.asarray([0.0610543, 0.819483, 1, 0.99988, 0.99995, 0.753089, 0.699158, 0.558164, 0.466733, 0.381675, 0.245444, 0.24857])  # GCaMP
-    mu_factor_A = np.asarray([0.376979, 0.760245, 1, 0.999439, 0.999927, 0.786846, 0.708944, 0.695928, 0.957517, 0.998632, 0.996917, 0.999331])  # channelrhodopsin
-    mu_factor_B = np.asarray([0.360422, 0.88336, 1, 0.999998, 0.999953, 0.7802, 0.616421, 0.456223, 0.348055, 0.305119, 0.315951, 0.274767])  # cerulean
+    mu_factor_A = np.asarray([0.99091, 0.957032, 0.844571, 0.782997, 0.719178, 0.571303, 0.471282, 0.363345, 0.273248, 0.188955, 0.246669])  # GCaMP 11
+    # mu_factor_A = np.asarray([0.376979, 0.760245, 1, 0.999439, 0.999927, 0.786846, 0.708944, 0.695928, 0.957517, 0.998632, 0.996917, 0.999331])  # channelrhodopsin 12
+    mu_factor_B = np.asarray([0.387479, 0.778226, 0.978226, 0.964315, 0.856, 0.743111, 0.692994, 0.725469, 0.750104, 0.763556, 0.726722])  # channelrhodopsin 11
+    # mu_factor_B = np.asarray([0.360422, 0.88336, 1, 0.999998, 0.999953, 0.7802, 0.616421, 0.456223, 0.348055, 0.305119, 0.315951, 0.274767])  # cerulean
+
     lower_bound = np.zeros_like(mu_factor_A)
     upper_bound = np.ones_like(mu_factor_A)
-    # freq_points_A = np.asarray(1239.84 / np.linspace(410, 520, 4 * len(mu_factor_A))[::-1])*energy_factor  # GCaMP
-    freq_points_A = np.asarray(1239.84 / np.linspace(270, 540, 4 * len(mu_factor_A))[::-1])*energy_factor  # channelrhodopsin
-    freq_points_B = np.asarray(1239.84 / np.linspace(320, 480, 4 * len(mu_factor_A))[::-1])*energy_factor  # cerulean
+
+    freq_points_A = np.asarray(1239.84 / np.linspace(400, 507, 4 * len(mu_factor_A))[::-1])*energy_factor  # GCaMP
+    freq_points_B = np.asarray(1239.84 / np.linspace(270, 540, 4 * len(mu_factor_A))[::-1])*energy_factor  # channelrhodopsin
+    # freq_points_B = np.asarray(1239.84 / np.linspace(320, 480, 4 * len(mu_factor_A))[::-1])*energy_factor  # cerulean
+
     Raman_levels_A = np.asarray([0.000, 0.09832, 0.16304, 0.20209])*energy_factor
     Raman_levels_B = np.asarray([0.000, 0.09832, 0.16304, 0.19909])*energy_factor
+
+    mu_factor_append_A = np.concatenate((np.asarray([1]), mu_factor_A))
+    mu_factor_append_B = np.concatenate((np.asarray([1]), mu_factor_B))
+    mu_big_A = np.kron(np.outer(mu_factor_append_A, mu_factor_append_A), np.ones((4, 4), dtype=np.complex))
+    mu_big_B = np.kron(np.outer(mu_factor_append_B, mu_factor_append_B), np.ones((4, 4), dtype=np.complex))
+    np.fill_diagonal(mu_big_A, 0j)
+    print(mu_big_A.real)
+    np.fill_diagonal(mu_big_B, 0j)
+    print(mu_big_B.real)
 
     print(1239.84/(freq_points_A[0]/energy_factor))
     params = ADict(
@@ -238,8 +251,8 @@ if __name__ == '__main__':
         time_factor=time_factor,
         rho_0=rho_0,
 
-        timeDIM_A=10000,
-        timeAMP_A=50000,
+        timeDIM_A=1000,
+        timeAMP_A=5000,
         timeDIM_R=10000,
         timeAMP_R=52000,
 
@@ -250,7 +263,7 @@ if __name__ == '__main__':
         frequencyMAX_R=0.21*energy_factor,
 
         field_amp_R=0.000032,
-        field_amp_A=0.000145,
+        field_amp_A=0.00000145,
 
         omega_R=0.5*energy_factor,
         omega_v=Raman_levels_A[3],
@@ -275,7 +288,7 @@ if __name__ == '__main__':
         lower_bound=lower_bound,
         upper_bound=upper_bound,
 
-        max_iter=5
+        max_iter=100
     )
 
     FourLevels = dict(
@@ -312,59 +325,59 @@ if __name__ == '__main__':
     # render_ticks(axes)
     # fig.savefig('fit_chr2.eps', format='eps')
 
-    fig, axes = plt.subplots(nrows=3, ncols=1, sharex=True)
-
-    molecule.time_A += molecule.time_R.max() + molecule.time_A.max()
-    time_axis = time_factor * (molecule.time_R.max() + np.concatenate((molecule.time_R, molecule.time_A)))
-
-    axes[0].plot(time_factor * (molecule.time_R.max() + molecule.time_R), 5.142e9*molecule.field_R.real, 'k', linewidth=1.5)
-    axes[0].plot(time_factor * (molecule.time_R.max() + molecule.time_A), 5.142e9*molecule.field_A.real, 'darkblue', linewidth=1.5)
-
-    axes[1].plot(time_factor * (molecule.time_R.max() + molecule.time_R), molecule.dyn_rho_R_A[0], 'b', label='g1_A', linewidth=1.)
-    axes[1].plot(time_factor * (molecule.time_R.max() + molecule.time_A), molecule.dyn_rho_A_A[0], 'b', label='g1_A', linewidth=2.5)
-
-    axes[1].plot(time_factor * (molecule.time_R.max() + molecule.time_R), molecule.dyn_rho_R_A[3], 'r', label='g4_A', linewidth=1.)
-    axes[1].plot(time_factor * (molecule.time_R.max() + molecule.time_A), molecule.dyn_rho_A_A[3], 'r', label='g4_A', linewidth=2.5)
-
-    axes[1].plot(time_factor * (molecule.time_R.max() + molecule.time_R), molecule.dyn_rho_R_A[4:].sum(axis=0), 'k', label='EXC_A', linewidth=1.)
-    axes[1].plot(time_factor * (molecule.time_R.max() + molecule.time_A), molecule.dyn_rho_A_A[4:].sum(axis=0), 'k', label='EXC_A', linewidth=2.5)
-
-    axes[2].plot(time_factor * (molecule.time_R.max() + molecule.time_R), molecule.dyn_rho_R_B[0], 'b', label='g1_B', linewidth=1.)
-    axes[2].plot(time_factor * (molecule.time_R.max() + molecule.time_A), molecule.dyn_rho_A_B[0], 'b', label='g1_B', linewidth=2.5)
-
-    axes[2].plot(time_factor * (molecule.time_R.max() + molecule.time_R), molecule.dyn_rho_R_B[3], 'r', label='g4_B', linewidth=1.)
-    axes[2].plot(time_factor * (molecule.time_R.max() + molecule.time_A), molecule.dyn_rho_A_B[3], 'r', label='g4_B', linewidth=2.5)
-
-    axes[2].plot(time_factor * (molecule.time_R.max() + molecule.time_R), molecule.dyn_rho_R_B[4:].sum(axis=0), 'k', label='EXC_B', linewidth=1.)
-    axes[2].plot(time_factor * (molecule.time_R.max() + molecule.time_A), molecule.dyn_rho_A_B[4:].sum(axis=0), 'k', label='EXC_B', linewidth=2.5)
-
-    axes[2].set_xlabel('Time (in ps)', fontweight='bold')
-    axes[0].set_ylabel('Electric field \n (in V/cm)', fontweight='bold')
-    axes[0].ticklabel_format(style='sci', scilimits=(0, 3))
-    axes[1].set_ylabel('Population \n VSFP', fontweight='bold')
-    axes[2].set_ylabel('Population \n ChR2', fontweight='bold')
-    render_ticks(axes[0])
-    render_ticks(axes[1])
-    render_ticks(axes[2])
-    axes[0].yaxis.set_label_position("right")
-    axes[1].yaxis.set_label_position("right")
-    axes[2].yaxis.set_label_position("right")
-
-    axes[1].legend(loc=6)
-    axes[2].legend(loc=6)
-
-    fig.subplots_adjust(left=0.15, hspace=0.1)
-
-    print(molecule.rhoA.diagonal()[:4].sum(), molecule.rhoA.diagonal()[4:].sum())
-    print(molecule.rhoA.diagonal(), molecule.rhoA.diagonal().sum())
-    print()
-    print(molecule.rhoB.diagonal()[:4].sum(), molecule.rhoB.diagonal()[4:].sum())
-    print(molecule.rhoB.diagonal(), molecule.rhoB.diagonal().sum())
-
-    print(molecule.rhoA.diagonal()[4:].sum() / molecule.rhoB.diagonal()[4:].sum())
-    print(molecule.rhoA.diagonal()[4:].sum() ** 2 / molecule.rhoB.diagonal()[4:].sum())
-
-    print(molecule.rhoB.diagonal()[4:].sum() / molecule.rhoA.diagonal()[4:].sum())
-    print(molecule.rhoB.diagonal()[4:].sum() ** 2 / molecule.rhoA.diagonal()[4:].sum())
+    # fig, axes = plt.subplots(nrows=3, ncols=1, sharex=True)
+    #
+    # molecule.time_A += molecule.time_R.max() + molecule.time_A.max()
+    # time_axis = time_factor * (molecule.time_R.max() + np.concatenate((molecule.time_R, molecule.time_A)))
+    #
+    # axes[0].plot(time_factor * (molecule.time_R.max() + molecule.time_R), 5.142e9*molecule.field_R.real, 'k', linewidth=1.5)
+    # axes[0].plot(time_factor * (molecule.time_R.max() + molecule.time_A), 5.142e9*molecule.field_A.real, 'darkblue', linewidth=1.5)
+    #
+    # axes[1].plot(time_factor * (molecule.time_R.max() + molecule.time_R), molecule.dyn_rho_R_A[0], 'b', label='g1_A', linewidth=1.)
+    # axes[1].plot(time_factor * (molecule.time_R.max() + molecule.time_A), molecule.dyn_rho_A_A[0], 'b', label='g1_A', linewidth=2.5)
+    #
+    # axes[1].plot(time_factor * (molecule.time_R.max() + molecule.time_R), molecule.dyn_rho_R_A[3], 'r', label='g4_A', linewidth=1.)
+    # axes[1].plot(time_factor * (molecule.time_R.max() + molecule.time_A), molecule.dyn_rho_A_A[3], 'r', label='g4_A', linewidth=2.5)
+    #
+    # axes[1].plot(time_factor * (molecule.time_R.max() + molecule.time_R), molecule.dyn_rho_R_A[4:].sum(axis=0), 'k', label='EXC_A', linewidth=1.)
+    # axes[1].plot(time_factor * (molecule.time_R.max() + molecule.time_A), molecule.dyn_rho_A_A[4:].sum(axis=0), 'k', label='EXC_A', linewidth=2.5)
+    #
+    # axes[2].plot(time_factor * (molecule.time_R.max() + molecule.time_R), molecule.dyn_rho_R_B[0], 'b', label='g1_B', linewidth=1.)
+    # axes[2].plot(time_factor * (molecule.time_R.max() + molecule.time_A), molecule.dyn_rho_A_B[0], 'b', label='g1_B', linewidth=2.5)
+    #
+    # axes[2].plot(time_factor * (molecule.time_R.max() + molecule.time_R), molecule.dyn_rho_R_B[3], 'r', label='g4_B', linewidth=1.)
+    # axes[2].plot(time_factor * (molecule.time_R.max() + molecule.time_A), molecule.dyn_rho_A_B[3], 'r', label='g4_B', linewidth=2.5)
+    #
+    # axes[2].plot(time_factor * (molecule.time_R.max() + molecule.time_R), molecule.dyn_rho_R_B[4:].sum(axis=0), 'k', label='EXC_B', linewidth=1.)
+    # axes[2].plot(time_factor * (molecule.time_R.max() + molecule.time_A), molecule.dyn_rho_A_B[4:].sum(axis=0), 'k', label='EXC_B', linewidth=2.5)
+    #
+    # axes[2].set_xlabel('Time (in ps)', fontweight='bold')
+    # axes[0].set_ylabel('Electric field \n (in V/cm)', fontweight='bold')
+    # axes[0].ticklabel_format(style='sci', scilimits=(0, 3))
+    # axes[1].set_ylabel('Population \n VSFP', fontweight='bold')
+    # axes[2].set_ylabel('Population \n ChR2', fontweight='bold')
+    # render_ticks(axes[0])
+    # render_ticks(axes[1])
+    # render_ticks(axes[2])
+    # axes[0].yaxis.set_label_position("right")
+    # axes[1].yaxis.set_label_position("right")
+    # axes[2].yaxis.set_label_position("right")
+    #
+    # axes[1].legend(loc=6)
+    # axes[2].legend(loc=6)
+    #
+    # fig.subplots_adjust(left=0.15, hspace=0.1)
+    #
+    # print(molecule.rhoA.diagonal()[:4].sum(), molecule.rhoA.diagonal()[4:].sum())
+    # print(molecule.rhoA.diagonal(), molecule.rhoA.diagonal().sum())
+    # print()
+    # print(molecule.rhoB.diagonal()[:4].sum(), molecule.rhoB.diagonal()[4:].sum())
+    # print(molecule.rhoB.diagonal(), molecule.rhoB.diagonal().sum())
+    #
+    # print(molecule.rhoA.diagonal()[4:].sum() / molecule.rhoB.diagonal()[4:].sum())
+    # print(molecule.rhoA.diagonal()[4:].sum() ** 2 / molecule.rhoB.diagonal()[4:].sum())
+    #
+    # print(molecule.rhoB.diagonal()[4:].sum() / molecule.rhoA.diagonal()[4:].sum())
+    # print(molecule.rhoB.diagonal()[4:].sum() ** 2 / molecule.rhoA.diagonal()[4:].sum())
 
     plt.show()

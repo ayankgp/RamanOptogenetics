@@ -87,6 +87,25 @@ class Molecule(Structure):
     ]
 
 
+class BigMolecule(Structure):
+    """
+    Parameters structure ctypes
+    """
+    _fields_ = [
+        ('nDIM_big', c_int),
+        ('energies_big', POINTER(c_double)),
+        ('gamma_population_decay_big', POINTER(c_double)),
+        ('gamma_pure_dephasing_big', POINTER(c_double)),
+        ('rho_0_big', POINTER(c_complex)),
+        ('mu_big', POINTER(c_complex)),
+
+        ('rho_big', POINTER(c_complex)),
+
+        ('dyn_rho_A_big', POINTER(c_complex)),
+        ('dyn_rho_R_big', POINTER(c_complex))
+    ]
+
+
 try:
     # Load the shared library assuming that it is in the same directory
     lib1 = ctypes.cdll.LoadLibrary(os.getcwd() + "/RamanOptogenetics.so")
