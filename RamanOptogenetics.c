@@ -374,12 +374,13 @@ void CalculateExcitationControlField(molecule* mol, const parameters *const para
     int timeDIM = params->timeDIM_A;
 
     double* t = params->time_A;
-
+    const double dt = fabs(t[1] - t[0]);
     double A = params->field_amp_A;
 
     for(i=0; i<timeDIM; i++)
     {
-        mol->field_A[i] = A * pow(cos(M_PI*t[i]/(fabs(2*t[0]))), 2) * cos(params->omega_e * t[i]);
+        const double time = t[i] + 0.5 * dt;
+        mol->field_A[i] = A * pow(cos(M_PI*time]/(fabs(2*t[0]))), 2) * cos(params->omega_e * time);
     }
 }
 
@@ -394,13 +395,15 @@ void CalculateRamanControlField(molecule* mol, const parameters *const params)
     int timeDIM_vib = params->timeDIM_R;
 
     double* t = params->time_R;
+    const double dt = fabs(t[1] - t[0]);
 
     double A_vib = params->field_amp_R;
     double w_R = params->omega_R;
 
     for(i=0; i<timeDIM_vib; i++)
     {
-        mol->field_R[i] = A_vib * pow(cos(M_PI*t[i]/(fabs(2*t[0]))), 2) * ((cos(w_R + params->omega_v * t[i])) + cos(w_R * t[i]));
+        const double time = t[i] + 0.5 * dt;
+        mol->field_R[i] = A_vib * pow(cos(M_PI*time/(fabs(2*t[0]))), 2) * ((cos(w_R + params->omega_v * t[i])) + cos(w_R * time));
     }
 }
 
@@ -496,7 +499,7 @@ void PropagateAbs(molecule* mol, const parameters *const params, const int indx)
             scale_mat(L_rho_func, dt/k, nDIM);
             add_mat(L_rho_func, mol->rho, nDIM);
             k+=1;
-        }while(complex_max_element(L_rho_func, nDIM) > 1.0E-6);
+        }while(complex_max_element(L_rho_func, nDIM) > 1.0E-8);
 
         copy_mat(mol->rho, L_rho_func, nDIM);
     }
@@ -515,7 +518,7 @@ void RamanControl(molecule* mol, const parameters *const params)
 {
     int i, j, k;
     int tau_index, t_index;
-    int nDIM = params->nDIM;
+    int nDIM = mol->nDIM;
     int timeDIM_vib = params->timeDIM_R;
 
     cmplx *rho_0 = mol->rho_0;
@@ -560,7 +563,7 @@ void ExcitationControl(molecule* mol, const parameters *const params)
 
     int i, j, k;
     int tau_index, t_index;
-    int nDIM = params->nDIM;
+    int nDIM = mol->nDIM;
     int timeDIM_abs = params->timeDIM_A;
 
     cmplx *rho_0 = mol->rho_0;
@@ -765,6 +768,42 @@ cmplx* CalculateSpectra(molecule* molA, parameters* params)
 }
 
 
+//cmplx* CalculateControl(molecule* molA, molecule* molB, parameters* params)
+////------------------------------------------------------------//
+////              CALCULATING RAMAN CONTROL PARAMETERS          //
+////------------------------------------------------------------//
+//{
+//    for(int j=0; j<params->nDIM - params->nEXC; j++)
+//    {
+//        molA->energies[j] = params->Raman_levels_A[j];
+//    }
+//    for(int j=0; j<params->nEXC; j++)
+//    {
+//        molA->energies[params->nDIM - params->nEXC + j] = params->freq_points_A[j];
+//    }
+//    scale_mat(molA->mu, params->mu_guess_A[0], params->nDIM);
+//
+//    for(int j=0; j<params->nDIM - params->nEXC; j++)
+//    {
+//        molB->energies[j] = params->Raman_levels_B[j];
+//    }
+//    for(int j=0; j<params->nEXC; j++)
+//    {
+//        molB->energies[params->nDIM - params->nEXC + j] = params->freq_points_B[j];
+//    }
+//    scale_mat(molB->mu, params->mu_guess_B[0], params->nDIM);
+//
+//    CalculateExcitationControlField(molA, params);
+//    CalculateExcitationControlField(molB, params);
+//    CalculateRamanControlField(molA, params);
+//    CalculateRamanControlField(molB, params);
+//
+//    RamanControl(molA, params);
+//    RamanControl(molB, params);
+//    ExcitationControl(molA, params);
+//    ExcitationControl(molB, params);
+//}
+
 cmplx* CalculateControl(molecule* molA, molecule* molB, parameters* params)
 //------------------------------------------------------------//
 //              CALCULATING RAMAN CONTROL PARAMETERS          //
@@ -778,7 +817,7 @@ cmplx* CalculateControl(molecule* molA, molecule* molB, parameters* params)
     {
         molA->energies[params->nDIM - params->nEXC + j] = params->freq_points_A[j];
     }
-    scale_mat(molA->mu, params->mu_guess_A[0], params->nDIM);
+//    scale_mat(molA->mu, params->mu_guess_A[0], params->nDIM);
 
     for(int j=0; j<params->nDIM - params->nEXC; j++)
     {
@@ -788,7 +827,7 @@ cmplx* CalculateControl(molecule* molA, molecule* molB, parameters* params)
     {
         molB->energies[params->nDIM - params->nEXC + j] = params->freq_points_B[j];
     }
-    scale_mat(molB->mu, params->mu_guess_B[0], params->nDIM);
+//    scale_mat(molB->mu, params->mu_guess_B[0], params->nDIM);
 
     CalculateExcitationControlField(molA, params);
     CalculateExcitationControlField(molB, params);
